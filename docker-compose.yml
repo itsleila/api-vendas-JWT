@@ -1,0 +1,111 @@
+services:
+
+  # --- Service Discovery ---
+  eureka-server:
+    build: ./eureka-server
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - microservicos-net
+
+  # --- Configurações centralizadas ---
+  config-server:
+    build: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./config-repo:/config-repo
+    environment:
+      - SPRING_PROFILES_ACTIVE=native
+      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:///config-repo
+    networks:
+      - microservicos-net
+
+  # --- Serviço de produtos ---
+  produtos-service:
+    build: ./produtos-service
+    container_name: produtos-service
+    depends_on:
+      - eureka-server
+      - config-server
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    ports:
+      - "8081:8081"
+    networks:
+      - microservicos-net
+
+  # --- Serviço de vendas ---
+  vendas-service:
+    build: ./vendas-service
+    container_name: vendas-service
+    depends_on:
+      - eureka-server
+      - config-server
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    ports:
+      - "8082:8082"
+    networks:
+      - microservicos-net
+
+  # --- Serviço de clientes ---
+  clientes-service:
+    build: ./clientes-service
+    container_name: clientes-service
+    depends_on:
+      - eureka-server
+      - config-server
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    ports:
+      - "8083:8083"
+    networks:
+      - microservicos-net
+
+  # --- Serviço de autenticação ---
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    depends_on:
+      - eureka-server
+      - config-server
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - JWT_SECRET=bWluaGEtY2hhdmUtc2VjcmV0YS1tdWl0by1zZWd1cmEtMjAyNg==
+    ports:
+      - "8084:8084"
+    networks:
+      - microservicos-net
+
+  # --- API Gateway ---
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    depends_on:
+      - eureka-server
+      - auth-service
+      - clientes-service
+      - vendas-service
+      - produtos-service
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - JWT_SECRET=bWluaGEtY2hhdmUtc2VjcmV0YS1tdWl0by1zZWd1cmEtMjAyNg==
+    ports:
+      - "8085:8085"
+    networks:
+      - microservicos-net
+
+networks:
+  microservicos-net:
+    driver: bridge
